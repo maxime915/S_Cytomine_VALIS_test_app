@@ -25,4 +25,4 @@ RUN python3 -c "from valis.registration import *; init_jvm(); kill_jvm()"
 
 COPY ./main.py ./main.py
 
-ENTRYPOINT [ "python3", "main.py" ]
+ENTRYPOINT [ "python3", "/app/main.py" ]
