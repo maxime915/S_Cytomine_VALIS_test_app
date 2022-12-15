@@ -304,8 +304,8 @@ class VALISJob(typing.NamedTuple):
         return rigid_registrar, non_rigid_registrar, micro_registrar
 
     def warp_annotations(self, registrar: registration.Valis):
-        logging.warning("skipped")
-        return
+        # logging.warning("skipped")
+        # return
         if not self.parameters.annotations_to_map:
             return
 
@@ -350,8 +350,8 @@ class VALISJob(typing.NamedTuple):
         annotations.save()
 
     def warp_images(self, registrar: registration.Valis):
-        logging.warning("skipped")
-        return
+        # logging.warning("skipped")
+        # return
         if not self.parameters.images_to_warp:
             return
         
