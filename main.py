@@ -68,7 +68,7 @@ class JobParameters(typing.NamedTuple):
     registration_type: RegistrationType
     compose_non_rigid: bool
 
-    # IDEA: pixel dims for registration (defines how scaled down they are)
+    # TODO: pixel dims for registration (defines how scaled down they are)
 
     # TODO: either select all userAnnotation in a project
     #   or select all annotations from a list of users (and filter by images)
