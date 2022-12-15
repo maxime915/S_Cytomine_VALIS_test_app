@@ -1,6 +1,10 @@
 {
     "name": "Cytomine_VALIS_test_app",
     "description": "A temporary Cytomine app to check valis",
+    "container-image": {
+        "image": "mamodeiuliege/s_cytomine_valis_test_app",
+        "type": "singularity"
+    },
     "schema-version": "cytomine-0.1",
     "command-line": "CYTOMINE_HOST CYTOMINE_PUBLIC_KEY CYTOMINE_PRIVATE_KEY CYTOMINE_ID_PROJECT CYTOMINE_ID_SOFTWARE REFERENCE_IMAGE TEMPLATE_IMAGE MAX_IMAGE_SIZE RERUN_REGISTRATION DELETE_PREVIOUSLY_TRANSFERRED_ANNOTATIONS STORE_DEFORMED_IMAGE FINEST_LEVEL",
     "inputs": [
