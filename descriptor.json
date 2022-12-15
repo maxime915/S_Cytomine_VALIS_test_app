@@ -1,140 +1,13 @@
 {
     "name": "Cytomine_VALIS_test_app",
-    "description": "A temporary Cytomine app to check valis",
+    "description": "A demo Cytomine app to display how to register images using VALIS",
     "container-image": {
         "image": "mamodeiuliege/s_cytomine_valis_test_app",
         "type": "singularity"
     },
     "schema-version": "cytomine-0.1",
-    "command-line": "CYTOMINE_HOST CYTOMINE_PUBLIC_KEY CYTOMINE_PRIVATE_KEY CYTOMINE_ID_PROJECT CYTOMINE_ID_SOFTWARE REFERENCE_IMAGE TEMPLATE_IMAGE MAX_IMAGE_SIZE RERUN_REGISTRATION DELETE_PREVIOUSLY_TRANSFERRED_ANNOTATIONS STORE_DEFORMED_IMAGE FINEST_LEVEL",
+    "command-line": "CYTOMINE_HOST CYTOMINE_PUBLIC_KEY CYTOMINE_PRIVATE_KEY CYTOMINE_ID_PROJECT CYTOMINE_ID_SOFTWARE ALL_IMAGES IMAGE_CROP REFERENCE_IMAGE IMAGE_ORDERING ALIGN_TOWARD_REFERENCE CHECK_FOR_REFLECTIONS REGISTRATION_TYPE COMPOSE_NON_RIGID ANNOTATION_TO_MAP IMAGES_TO_WARP MAP_ANNOTATIONS_TO_WARPED_IMAGES",
     "inputs": [
-        {
-            "id": "reference_image",
-            "name": "Reference Image",
-            "description": "Reference Image. Taken from ALL_IMAGES if not given",
-            "type": "Domain",
-            "uri": "/api/project/$currentProject$/imageinstance.json",
-            "uri-print-attribute": "instanceFilename",
-            "uri-sort-attribute": "instanceFilename",
-            "optional": true,
-            "value-key": "@ID",
-            "command-line-flag": "--@id"
-        },
-        {
-            "id": "all_images",
-            "name": "All Images",
-            "description": "All Images that will be registered to or toward the reference image (may or may not include the reference image)",
-            "type": "ListDomain",
-            "uri": "/api/project/$currentProject$/imageinstance.json",
-            "uri-print-attribute": "instanceFilename",
-            "uri-sort-attribute": "instanceFilename",
-            "optional": false,
-            "value-key": "@ID",
-            "command-line-flag": "--@id"
-        },
-        {
-            "id": "image_ordering",
-            "name": "Image ordering",
-            "description": "How to order the images before doing the registration (useful for 3D registration)",
-            "type": "String",
-            "optional": true,
-            "value-choices": ["auto", "name", "created"],
-            "default": "auto",
-            "value-key":"@ID",
-            "command-line-flag":"--@id"
-        },
-        {
-            "id": "align_toward_reference",
-            "name": "Align Toward Reference",
-            "description": "Align images toward the reference, rather that directly to the reference. Meaningless for 2 images problems, see VALIS documentation for more info.",
-            "type": "Boolean",
-            "optional": true,
-            "default": true,
-            "value-key": "@ID",
-            "command-line-flag": "--@id"
-        },
-        {
-            "id": "image_crop",
-            "name": "Cropping modes for all images",
-            "description": "How to define the registration domain relative to all images. 'reference' defines the reference image as the domain, 'overlap' means the common area only, 'all' means the smallest area to include all images.",
-            "type": "String",
-            "optional": false,
-            "value-key": "@ID",
-            "value-choices": ["reference", "overlap", "all"],
-            "command-line-flag":"--@id"
-        },
-        {
-            "id": "check_for_reflections",
-            "name": "Check for reflections",
-            "description": "Check for reflections in the image. Costly parameters, so best done by hand if possible",
-            "type": "Boolean",
-            "optional": true,
-            "default": false,
-            "value-key":"@ID",
-            "command-line-flag":"--@id"
-        },
-        {
-            "id": "registration_type",
-            "name": "Registration Type",
-            "description": "The type of registration performed by VALIS",
-            "type": "String",
-            "optional": true,
-            "value-choices": ["rigid", "non-rigid", "micro"],
-            "default": "non-rigid",
-            "value-key":"@ID",
-            "command-line-flag":"--@id"
-        },
-        {
-            "id": "compose_non_rigid",
-            "name": "Compose using non rigid deformation",
-            "description": "May be useful to bring ...",
-            "type": "Boolean",
-            "optional": true,
-            "default": false,
-            "value-key":"@ID",
-            "command-line-flag":"--@id"
-        },
-
-
-        {
-            "id": "annotation_to_map",
-            "name": "Annotations to map",
-            "description": "Annotations that should be mapped to the reference image after registration",
-            "type": "ListDomain",
-            "uri": "/api/annotation.json?project=$currentProject$",
-            "uri-print-attribute": "id",
-            "uri-sort-attribute": "id",
-            "optional": true,
-            "default": "",
-            "value-key": "@ID",
-            "command-line-flag": "--@id"
-        },
-        {
-            "id": "images_to_warp",
-            "name": "Images to warp",
-            "description": "All Images that should be deformed to match the reference (it may be useful to select the reference if 'crop' is not 'reference')",
-            "type": "ListDomain",
-            "uri": "/api/project/$currentProject$/imageinstance.json",
-            "uri-print-attribute": "instanceFilename",
-            "uri-sort-attribute": "instanceFilename",
-            "optional": true,
-            "default": "",
-            "value-key": "@ID",
-            "command-line-flag": "--@id"
-        },
-        {
-            "id": "map_annotations_to_warped_images",
-            "name": "Map annotations to warped images",
-            "description": "If true, map annotation to the newly warped images",
-            "type": "Boolean",
-            "optional": true,
-            "default": true,
-            "value-key":"@ID",
-            "command-line-flag":"--@id"
-        },
-
-
-
         {
             "id": "cytomine_host",
             "name": "Cytomine host",
@@ -177,6 +50,140 @@
             "set-by-server": true,
             "optional": false,
             "type": "Number",
+            "value-key": "@ID",
+            "command-line-flag": "--@id"
+        },
+        {
+            "id": "all_images",
+            "name": "All Images",
+            "description": "All Images that will be registered to or toward the reference image (may or may not include the reference image)",
+            "type": "ListDomain",
+            "uri": "/api/project/$currentProject$/imageinstance.json",
+            "uri-print-attribute": "instanceFilename",
+            "uri-sort-attribute": "instanceFilename",
+            "optional": false,
+            "value-key": "@ID",
+            "command-line-flag": "--@id"
+        },
+        {
+            "id": "image_crop",
+            "name": "Cropping modes for all images",
+            "description": "How to define the registration domain relative to all images. 'reference' defines the reference image as the domain, 'overlap' means the common area only, 'all' means the smallest area to include all images.",
+            "type": "String",
+            "optional": false,
+            "value-key": "@ID",
+            "value-choices": [
+                "reference",
+                "overlap",
+                "all"
+            ],
+            "command-line-flag": "--@id"
+        },
+        {
+            "id": "reference_image",
+            "name": "Reference Image",
+            "description": "Reference Image. Taken from ALL_IMAGES if not given",
+            "type": "Domain",
+            "uri": "/api/project/$currentProject$/imageinstance.json",
+            "uri-print-attribute": "instanceFilename",
+            "uri-sort-attribute": "instanceFilename",
+            "optional": true,
+            "value-key": "@ID",
+            "command-line-flag": "--@id"
+        },
+        {
+            "id": "image_ordering",
+            "name": "Image ordering",
+            "description": "How to order the images before doing the registration (useful for 3D registration)",
+            "type": "String",
+            "optional": true,
+            "value-choices": [
+                "auto",
+                "name",
+                "created"
+            ],
+            "default": "auto",
+            "value-key": "@ID",
+            "command-line-flag": "--@id"
+        },
+        {
+            "id": "align_toward_reference",
+            "name": "Align Toward Reference",
+            "description": "Align images toward the reference, rather that directly to the reference. Meaningless for 2 images problems, see VALIS documentation for more info.",
+            "type": "Boolean",
+            "optional": true,
+            "default": true,
+            "value-key": "@ID",
+            "command-line-flag": "--@id"
+        },
+        {
+            "id": "check_for_reflections",
+            "name": "Check for reflections",
+            "description": "Check for reflections in the image. Costly parameters, so best done by hand if possible",
+            "type": "Boolean",
+            "optional": true,
+            "default": false,
+            "value-key": "@ID",
+            "command-line-flag": "--@id"
+        },
+        {
+            "id": "registration_type",
+            "name": "Registration Type",
+            "description": "The type of registration performed by VALIS",
+            "type": "String",
+            "optional": true,
+            "value-choices": [
+                "rigid",
+                "non-rigid",
+                "micro"
+            ],
+            "default": "non-rigid",
+            "value-key": "@ID",
+            "command-line-flag": "--@id"
+        },
+        {
+            "id": "compose_non_rigid",
+            "name": "Compose using non rigid deformation",
+            "description": "May be useful to bring ...",
+            "type": "Boolean",
+            "optional": true,
+            "default": false,
+            "value-key": "@ID",
+            "command-line-flag": "--@id"
+        },
+        {
+            "id": "annotation_to_map",
+            "name": "Annotations to map",
+            "description": "Annotations that should be mapped to the reference image after registration",
+            "type": "ListDomain",
+            "uri": "/api/annotation.json?project=$currentProject$",
+            "uri-print-attribute": "id",
+            "uri-sort-attribute": "id",
+            "optional": true,
+            "default": "",
+            "value-key": "@ID",
+            "command-line-flag": "--@id"
+        },
+        {
+            "id": "images_to_warp",
+            "name": "Images to warp",
+            "description": "All Images that should be deformed to match the reference (it may be useful to select the reference if 'crop' is not 'reference')",
+            "type": "ListDomain",
+            "uri": "/api/project/$currentProject$/imageinstance.json",
+            "uri-print-attribute": "instanceFilename",
+            "uri-sort-attribute": "instanceFilename",
+            "optional": true,
+            "default": "",
+            "value-key": "@ID",
+            "command-line-flag": "--@id"
+        },
+        {
+            "id": "map_annotations_to_warped_images",
+            "name": "Map annotations to warped images",
+            "description": "If true, map annotation to the newly warped images",
+            "type": "Boolean",
+            "optional": true,
+            "default": true,
             "value-key": "@ID",
             "command-line-flag": "--@id"
         }
