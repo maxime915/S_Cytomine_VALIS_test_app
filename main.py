@@ -1,6 +1,5 @@
 import contextlib
 import enum
-import functools
 import logging
 import pathlib
 import pickle
