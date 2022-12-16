@@ -52,7 +52,7 @@ def eb(val: typing.Union[str, bool]) -> bool:
 
 class JobParameters(typing.NamedTuple):
     """"""
-    
+
     # IDEA: previous Job ID to pick the registrar used ?
 
     # IDEA: img_type: ["brightfield", "fluorescence", "multi", None]
@@ -114,7 +114,9 @@ class JobParameters(typing.NamedTuple):
 
         annotation_to_map_ids = []
         if has("annotation_to_map"):
-            annotation_to_map_ids = [ei(i) for i in namespace.annotation_to_map.split(",")]
+            annotation_to_map_ids = [
+                ei(i) for i in namespace.annotation_to_map.split(",")
+            ]
 
         images_to_warp_ids = []
         if has("images_to_warp"):
@@ -196,7 +198,7 @@ class VALISJob(typing.NamedTuple):
             self.register(registrar)
             self.update(60, "Registered all images")
 
-            self.warp_annotations(registrar)
+            self.warp_annotations_to_ref(registrar)
             self.update(70, "Warped all annotations")
 
             self.warp_images(registrar)
@@ -273,7 +275,7 @@ class VALISJob(typing.NamedTuple):
         # rigid and non-rigid registration
         rigid_registrar, non_rigid_registrar, _ = registrar.register()
         micro_registrar = None
-        
+
         assert rigid_registrar is not None
 
         # attach registrar to Job in Cytomine (automatically pickled by VALIS)
@@ -302,20 +304,28 @@ class VALISJob(typing.NamedTuple):
 
         return rigid_registrar, non_rigid_registrar, micro_registrar
 
-    def warp_annotations(self, registrar: registration.Valis):
-        # logging.warning("skipped")
-        # return
+    def warp_annotations_to_ref(
+        self,
+        registrar: registration.Valis,
+        dest_imgs: typing.Optional[typing.Iterable[models.ImageInstance]] = None,
+    ):
         if not self.parameters.annotations_to_map:
             return
 
         # create an output collection
-        # warp all annotation that aren't on the reference image to the reference image
+        # warp all annotation that aren't on the reference image
 
         reference_image = self.get_reference_image(registrar)
         reference_slide = registrar.get_slide(self.get_image_path(reference_image))
 
+        if not dest_imgs:
+            dest_imgs = [reference_image]
+        for idx, img in enumerate(dest_imgs):
+            if not isinstance(img, (models.ImageInstance)):
+                raise ValueError(f"img at {idx=} is not an ImageInstance")
+
         annotations = models.AnnotationCollection()
-        
+
         image_cache = {int(img.id): img for img in self.parameters.all_images}
 
         for annotation in self.parameters.annotations_to_map:
@@ -335,15 +345,16 @@ class VALISJob(typing.NamedTuple):
                 )
                 return warped_xy[:, 0], warped_xy[:, 1]
 
-            warped_geometry = transform(_warper, geometry)
-            annotations.append(
-                models.Annotation(
-                    shapely.wkt.dumps(warped_geometry),
-                    reference_image.id,
-                    annotation.term,
-                    annotation.project,
+            warped_geometry = shapely.wkt.dumps(transform(_warper, geometry))
+            for img in dest_imgs:
+                annotations.append(
+                    models.Annotation(
+                        warped_geometry,
+                        img.id,
+                        annotation.term,
+                        annotation.project,
+                    )
                 )
-            )
 
         logging.info("pushing %d annotations", len(annotations))
         annotations.save()
