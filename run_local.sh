@@ -17,4 +17,5 @@ python main.py \
     --registration_type "non-rigid" \
     --compose_non_rigid "false" \
     --annotation_to_map "551735031,551734856" \
-    --images_to_warp "551728445,551728438,551728431"
+    --images_to_warp "551728445,551728438,551728431" \
+    --map_annotations_to_warped_images "true"

@@ -1,9 +1,11 @@
 import contextlib
+import datetime
 import enum
 import logging
 import pathlib
 import pickle
 import sys
+import time
 import typing
 
 import cytomine
@@ -50,6 +52,30 @@ def eb(val: typing.Union[str, bool]) -> bool:
     raise ValueError(f"{val=!r} is not a bool")
 
 
+RetType = typing.TypeVar("RetType")
+
+
+def retry(
+    fun: typing.Callable[[], typing.Optional[RetType]],
+    delay: float = 1.0,
+    max_retry: int = 5,
+    call_back: typing.Callable[[int], None] = None,
+):
+    "retry if the result of fun is None"
+
+    for retry_ in range(max_retry):
+        time.sleep(0.0 if retry_ == 0 else delay)
+
+        val = fun()
+        if val is not None:
+            return val
+
+        if call_back is not None:
+            call_back(retry_)
+
+    return None
+
+
 class JobParameters(typing.NamedTuple):
     """"""
 
@@ -73,8 +99,7 @@ class JobParameters(typing.NamedTuple):
     #   or select all annotations from a list of users (and filter by images)
     annotations_to_map: typing.List[models.Annotation]
     images_to_warp: typing.List[models.ImageInstance]
-    # FIXME not ready
-    # map_annotations_to_warped_images: bool
+    map_annotations_to_warped_images: bool
 
     @staticmethod
     def check(namespace: typing.Mapping[str, typing.Any], project: models.Project):
@@ -122,9 +147,11 @@ class JobParameters(typing.NamedTuple):
         if has("images_to_warp"):
             images_to_warp_ids = [ei(i) for i in namespace.images_to_warp.split(",")]
 
-        # map_annotations_to_warped_images = False
-        # if has("map_annotations_to_warped_images"):
-        #     map_annotations_to_warped_images = eb(namespace.map_annotations_to_warped_images)
+        map_annotations_to_warped_images = False
+        if has("map_annotations_to_warped_images"):
+            map_annotations_to_warped_images = eb(
+                namespace.map_annotations_to_warped_images
+            )
 
         if ref_image_id is not None and ref_image_id not in all_image_ids:
             all_image_ids.append(ref_image_id)
@@ -163,7 +190,7 @@ class JobParameters(typing.NamedTuple):
             compose_non_rigid=compose_non_rigid,
             annotations_to_map=[ann_cache[id] for id in annotation_to_map_ids],
             images_to_warp=[img_cache[idx] for idx in images_to_warp_ids],
-            # map_annotations_to_warped_images=map_annotations_to_warped_images,
+            map_annotations_to_warped_images=map_annotations_to_warped_images,
         )
 
 
@@ -177,7 +204,7 @@ class VALISJob(typing.NamedTuple):
 
     def update(self, progress: int, status: str):
         self.cytomine_job.job.update(
-            status=models.Job.RUNNING, progress=progress, status_comment=status
+            status=models.Job.RUNNING, progress=progress, statusComment=status
         )
 
     def run(self):
@@ -201,8 +228,12 @@ class VALISJob(typing.NamedTuple):
             self.warp_annotations_to_ref(registrar)
             self.update(70, "Warped all annotations")
 
-            self.warp_images(registrar)
-            self.update(99, "Warped all images")
+            img_lst = self.warp_images(registrar)
+            self.update(89, "Warped all images")
+
+            if self.parameters.map_annotations_to_warped_images:
+                self.warp_annotations_to_ref(registrar, img_lst)
+                self.update(99, "Warped all annotations to uploaded images")
 
     def get_valis_args(self):
         valis_args = {
@@ -235,7 +266,11 @@ class VALISJob(typing.NamedTuple):
         return str(self.src_dir / fname)
 
     def get_warped_image_path_ome_tiff(self, image: models.ImageInstance) -> str:
-        fname = f"{self.cytomine_job.software.id}_" + image.filename
+        fname = "{app}-{utc}_{name}".format(
+            app=self.cytomine_job.software.id,
+            utc=datetime.datetime.utcnow().strftime("%Y%m%d-%H%M%S"),
+            name=image.filename,
+        )
         return str((self.dst_dir / "saved-images" / fname).with_suffix(".ome.tiff"))
 
     def download_all_images(self):
@@ -360,18 +395,18 @@ class VALISJob(typing.NamedTuple):
         annotations.save()
 
     def warp_images(self, registrar: registration.Valis):
-        # logging.warning("skipped")
-        # return
+
         if not self.parameters.images_to_warp:
-            return
-        
+            uploaded_images: typing.List[models.ImageInstance] = []
+            return uploaded_images
+
         # TODO add upload_host as a parameter
 
         # get storage
         userJob = models.UserJob().fetch(id=self.cytomine_job.job.userJob)
         all_storage = models.StorageCollection().fetch()
         user_storage = [s for s in all_storage if s.user == userJob.user][0]
-        
+
         # warp all images and save to disk
         warped_images: typing.List[str] = []
         for image in self.parameters.images_to_warp:
@@ -380,9 +415,11 @@ class VALISJob(typing.NamedTuple):
 
             slide: registration.Slide = registrar.get_slide(path_src)
             slide.warp_and_save_slide(path_dst)
-            
+
             warped_images.append(path_dst)
-        
+
+        uploaded_files: typing.List[models.UploadedFile] = []
+
         for path_dst in warped_images:
             uf = self.cytomine_job.upload_image(
                 upload_host="https://research-upload.cytomine.be/",
@@ -390,8 +427,51 @@ class VALISJob(typing.NamedTuple):
                 id_storage=user_storage.id,
                 id_project=self.cytomine_job.project.id,
             )
+            if not uf:
+                logging.error("failed to upload image %s", path_dst)
+            else:
+                uploaded_files.append(uf)
+        
+        return self.get_image_instances(uploaded_files)
 
+    def get_image_instances(self, uploaded_files: typing.List[models.UploadedFile]):
+        # IMPORTANT: API doesn't do instant modification, retry with time delay is necessary
 
+        base_ids: typing.List[int] = []
+        for uf in uploaded_files:
+
+            def _get_abstract_image():
+                response_ = self.cytomine_job.get(
+                    f"{uf.callback_identifier}/{uf.id}/abstractimage.json"
+                )
+                if not response_:
+                    return None
+                return response_
+
+            response = retry(_get_abstract_image)
+            if response:
+                base_ids.append(response["id"])
+            else:
+                logging.error("giving up on UF:%d", uf.id)
+
+        def _get_lst():
+            images = models.ImageInstanceCollection().fetch_with_filter(
+                "project", self.cytomine_job.project.id
+            )
+            images_by_base: typing.Mapping[int, models.ImageInstance] = {
+                image.baseImage: image for image in images
+            }
+
+            try:
+                return [images_by_base[idx] for idx in base_ids]
+            except KeyError:
+                return None
+
+        lst = retry(_get_lst)
+        if not lst:
+            raise ValueError("impossible to fetch the list of images")
+
+        return lst
 
 
 def main(arguments):
