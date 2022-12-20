@@ -2,6 +2,7 @@ import contextlib
 import datetime
 import enum
 import logging
+import os
 import pathlib
 import pickle
 import sys
@@ -74,6 +75,17 @@ def retry(
             call_back(retry_)
 
     return None
+
+
+@contextlib.contextmanager
+def no_output():
+    try:
+        with open(os.devnull, "w") as devnull:
+            with contextlib.redirect_stderr(devnull):
+                with contextlib.redirect_stdout(devnull):
+                    yield None
+    finally:
+        pass
 
 
 class JobParameters(typing.NamedTuple):
@@ -352,7 +364,7 @@ class VALISJob(typing.NamedTuple):
     def register(self, registrar: registration.Valis):
 
         # rigid and non-rigid registration
-        with contextlib.redirect_stderr(None), contextlib.redirect_stdout(None):
+        with no_output():
             rigid_registrar, non_rigid_registrar, _ = registrar.register()
         micro_registrar = None
 
@@ -461,7 +473,7 @@ class VALISJob(typing.NamedTuple):
             path_dst = self.get_warped_image_path_ome_tiff(image)
 
             slide: registration.Slide = registrar.get_slide(path_src)
-            with contextlib.redirect_stderr(None), contextlib.redirect_stdout(None):
+            with no_output():
                 # remove progress bar
                 slide.warp_and_save_slide(path_dst)
             self.logger.info("warped %s", path_dst)
