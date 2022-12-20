@@ -454,7 +454,7 @@ class VALISJob(typing.NamedTuple):
                     return None
                 return response_
 
-            response = retry(_get_abstract_image)
+            response = retry(_get_abstract_image, delay=1.5, max_retry=10)
             if response:
                 base_ids.append(response["id"])
             else:
