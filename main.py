@@ -308,10 +308,13 @@ class VALISJob(typing.NamedTuple):
     def register(self, registrar: registration.Valis):
 
         # rigid and non-rigid registration
-        rigid_registrar, non_rigid_registrar, _ = registrar.register()
+        with contextlib.redirect_stderr(None), contextlib.redirect_stdout(None):
+            rigid_registrar, non_rigid_registrar, _ = registrar.register()
         micro_registrar = None
 
         assert rigid_registrar is not None
+
+        logging.info("registered all images")
 
         # attach registrar to Job in Cytomine (automatically pickled by VALIS)
         registrar_path = self.registrar_path()
@@ -414,7 +417,10 @@ class VALISJob(typing.NamedTuple):
             path_dst = self.get_warped_image_path_ome_tiff(image)
 
             slide: registration.Slide = registrar.get_slide(path_src)
-            slide.warp_and_save_slide(path_dst)
+            with contextlib.redirect_stderr(None), contextlib.redirect_stdout(None):
+                # remove progress bar
+                slide.warp_and_save_slide(path_dst)
+            logging.info("warped %s", path_dst)
 
             warped_images.append(path_dst)
 
