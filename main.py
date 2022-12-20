@@ -267,27 +267,34 @@ class VALISJob(typing.NamedTuple):
         self.update(1, "Parsed parameters")
 
         with contextlib.ExitStack() as stack:
+            self.update(1, "Initializing JVM")
             registration.init_jvm()
             stack.callback(registration.kill_jvm)
             self.update(2, "Initialized JVM")
 
+            self.update(2, "Downloading all images")
             self.download_all_images()
             self.update(20, "Downloaded images")
 
+            self.update(20, "Creating registrar")
             # NOTE Valis doesn't allow 'lazy' folders: the images must be downloaded before creating the registrar
             registrar = registration.Valis(**self.get_valis_args())
             self.update(21, "Created registrar")
 
+            self.update(21, "Registering all images")
             self.register(registrar)
             self.update(60, "Registered all images")
 
+            self.update(60, "Warping all annotations")
             self.warp_annotations_to_ref(registrar)
             self.update(70, "Warped all annotations")
 
+            self.update(70, "Warping images")
             img_lst = self.warp_images(registrar)
             self.update(89, "Warped all images")
 
             if self.parameters.map_annotations_to_warped_images:
+                self.update(99, "Warping annotations to uploaded images")
                 self.warp_annotations_to_ref(registrar, img_lst)
                 self.update(99, "Warped all annotations to uploaded images")
 
