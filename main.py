@@ -193,6 +193,45 @@ class JobParameters(typing.NamedTuple):
             map_annotations_to_warped_images=map_annotations_to_warped_images,
         )
 
+    def __repr__(self) -> str:
+        asdict = self._asdict()
+        if self.reference_image is not None:
+            asdict["reference_image"] = self.reference_image.id
+        asdict["all_images"] = [img.id for img in self.all_images]
+        asdict["annotations_to_map"] = [a.id for a in self.annotations_to_map]
+        asdict["images_to_warp"] = [img.id for img in self.images_to_warp]
+
+        return pretty_repr(asdict)
+
+
+def pretty_repr(o: typing.Any) -> str:
+    if isinstance(o, (int, float, str, type(None))):
+        return f"{o!r}"
+
+    if isinstance(o, enum.Enum):
+        return type(o).__name__ + "." + o.name
+
+    # named tuple
+    if isinstance(o, tuple) and hasattr(o, "_asdict"):
+        return f"{o!r}"
+
+    if isinstance(o, typing.Mapping):
+        inner = (pretty_repr(k) + ":" + pretty_repr(v) for k, v in o.items())
+        return "{" + ", ".join(inner) + "}"
+
+    if isinstance(o, typing.Iterable):
+        return "[" + ", ".join(pretty_repr(s) for s in o) + "]"
+
+    if hasattr(o, "__dict__"):
+        return str(type(o)) + ":" + pretty_repr(vars(o))
+
+    if hasattr(o, "__slots__"):
+        inner = pretty_repr({attr: getattr(o, attr) for attr in o.__slots__})
+        return str(type(o)) + ":" + inner
+
+    # default representation
+    return f"{o!r}"
+
 
 class VALISJob(typing.NamedTuple):
 
@@ -201,6 +240,7 @@ class VALISJob(typing.NamedTuple):
     src_dir: pathlib.Path
     dst_dir: pathlib.Path
     name: str
+    logger: logging.Logger = logging.getLogger("VALISJob")
 
     def update(self, progress: int, status: str):
         self.cytomine_job.job.update(
@@ -208,11 +248,15 @@ class VALISJob(typing.NamedTuple):
         )
 
     def run(self):
+        # logger config
+        self.logger.setLevel(logging.INFO)
+        self.logger.info(pretty_repr(self.parameters))
+
         self.update(1, "Parsed parameters")
 
         with contextlib.ExitStack() as stack:
             registration.init_jvm()
-            stack.callback(lambda: registration.kill_jvm())
+            stack.callback(registration.kill_jvm)
             self.update(2, "Initialized JVM")
 
             self.download_all_images()
@@ -314,7 +358,7 @@ class VALISJob(typing.NamedTuple):
 
         assert rigid_registrar is not None
 
-        logging.info("registered all images")
+        self.logger.info("registered all images")
 
         # attach registrar to Job in Cytomine (automatically pickled by VALIS)
         registrar_path = self.registrar_path()
@@ -394,7 +438,7 @@ class VALISJob(typing.NamedTuple):
                     )
                 )
 
-        logging.info("pushing %d annotations", len(annotations))
+        self.logger.info("pushing %d annotations", len(annotations))
         annotations.save()
 
     def warp_images(self, registrar: registration.Valis):
@@ -420,7 +464,7 @@ class VALISJob(typing.NamedTuple):
             with contextlib.redirect_stderr(None), contextlib.redirect_stdout(None):
                 # remove progress bar
                 slide.warp_and_save_slide(path_dst)
-            logging.info("warped %s", path_dst)
+            self.logger.info("warped %s", path_dst)
 
             warped_images.append(path_dst)
 
@@ -434,10 +478,10 @@ class VALISJob(typing.NamedTuple):
                 id_project=self.cytomine_job.project.id,
             )
             if not uf:
-                logging.error("failed to upload image %s", path_dst)
+                self.logger.error("failed to upload image %s", path_dst)
             else:
                 uploaded_files.append(uf)
-        
+
         return self.get_image_instances(uploaded_files)
 
     def get_image_instances(self, uploaded_files: typing.List[models.UploadedFile]):
@@ -458,7 +502,7 @@ class VALISJob(typing.NamedTuple):
             if response:
                 base_ids.append(response["id"])
             else:
-                logging.error("giving up on UF:%d", uf.id)
+                self.logger.error("giving up on UF:%d", uf.id)
 
         def _get_lst():
             images = models.ImageInstanceCollection().fetch_with_filter(
