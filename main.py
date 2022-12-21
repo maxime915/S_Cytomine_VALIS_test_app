@@ -1,6 +1,7 @@
 import contextlib
 import datetime
 import enum
+import functools
 import logging
 import os
 import pathlib
@@ -286,7 +287,7 @@ class VALISJob(typing.NamedTuple):
             self.update(60, "Registered all images")
 
             self.update(60, "Warping all annotations")
-            self.warp_annotations_to_ref(registrar)
+            self.warp_annotations(registrar, to_reference=True)
             self.update(70, "Warped all annotations")
 
             self.update(70, "Warping images")
@@ -294,8 +295,8 @@ class VALISJob(typing.NamedTuple):
             self.update(89, "Warped all images")
 
             if self.parameters.map_annotations_to_warped_images:
-                self.update(99, "Warping annotations to uploaded images")
-                self.warp_annotations_to_ref(registrar, img_lst)
+                self.update(89, "Warping annotations to uploaded images")
+                self.warp_annotations(registrar, img_lst)
                 self.update(99, "Warped all annotations to uploaded images")
 
     def get_valis_args(self):
@@ -405,11 +406,20 @@ class VALISJob(typing.NamedTuple):
 
         return rigid_registrar, non_rigid_registrar, micro_registrar
 
-    def warp_annotations_to_ref(
+    def warp_annotations(
         self,
         registrar: registration.Valis,
         dest_imgs: typing.Optional[typing.Iterable[models.ImageInstance]] = None,
+        to_reference: bool = False,
     ):
+        if to_reference and dest_imgs:
+            raise ValueError(
+                "cannot warp the annotation to the reference and \
+                other images in a single call to warp_annotations"
+            )
+        if not to_reference and not dest_imgs:
+            raise ValueError("either to_reference is True, or dest_imgs is non empty")
+
         if not self.parameters.annotations_to_map:
             return
 
@@ -419,15 +429,34 @@ class VALISJob(typing.NamedTuple):
         reference_image = self.get_reference_image(registrar)
         reference_slide = registrar.get_slide(self.get_image_path(reference_image))
 
-        if not dest_imgs:
-            dest_imgs = [reference_image]
-        for idx, img in enumerate(dest_imgs):
-            if not isinstance(img, (models.ImageInstance)):
-                raise ValueError(f"img at {idx=} is not an ImageInstance")
-
         annotations = models.AnnotationCollection()
 
         image_cache = {int(img.id): img for img in self.parameters.all_images}
+
+        if to_reference:
+            dest_imgs = [reference_image]
+        else:
+            for idx, img in enumerate(dest_imgs):
+                if not isinstance(img, (models.ImageInstance)):
+                    raise ValueError(f"img at {idx=} is not an ImageInstance")
+
+            if any(img.id in image_cache for img in dest_imgs):
+                raise ValueError(
+                    "when warping to non-reference image, only \
+                    new images are supported"
+                )
+
+        def warper(src: registration.Slide, x, y, z=None):
+            if z is not None:
+                raise ValueError("unable to warp 3D points")
+
+            xy = np.stack([x, y], axis=1)
+            if to_reference:
+                warped_xy = src.warp_xy_from_to(xy, reference_slide)
+            else:
+                warped_xy = src.warp_xy(xy, crop=True)
+
+            return warped_xy[:, 0], warped_xy[:, 1]
 
         for annotation in self.parameters.annotations_to_map:
             image = image_cache[annotation.image]
@@ -436,18 +465,13 @@ class VALISJob(typing.NamedTuple):
             # get annotation geometry
             geometry = shapely.wkt.loads(annotation.location)
 
-            # warp annotation
-            def _warper(x, y, z=None):
-                if z is not None:
-                    raise ValueError("unable to warp 3D points")
-
-                warped_xy = slide.warp_xy_from_to(
-                    np.stack([x, y], axis=1), reference_slide
-                )
-                return warped_xy[:, 0], warped_xy[:, 1]
-
-            warped_geometry = shapely.wkt.dumps(transform(_warper, geometry))
+            warped_geometry = shapely.wkt.dumps(
+                transform(functools.partial(warper, slide), geometry)
+            )
             for img in dest_imgs:
+                if img.id == annotation.image:
+                    continue  # avoid duplicate annotations
+
                 annotations.append(
                     models.Annotation(
                         warped_geometry,
@@ -517,7 +541,7 @@ class VALISJob(typing.NamedTuple):
                     return None
                 return response_
 
-            response = retry(_get_abstract_image, delay=1.5, max_retry=10)
+            response = retry(_get_abstract_image, delay=1.5, max_retry=20)
             if response:
                 base_ids.append(response["id"])
             else:
