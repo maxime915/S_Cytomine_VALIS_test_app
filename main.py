@@ -14,6 +14,7 @@ import cytomine
 import numpy as np
 import shapely.wkt
 from cytomine import models
+from shapely.affinity import affine_transform
 from shapely.ops import transform
 from valis import registration
 
@@ -378,7 +379,7 @@ class VALISJob(typing.NamedTuple):
 
         assert rigid_registrar is not None
 
-        self.logger.info("registered all images")
+        self.logger.info("non-micro registration done")
 
         # attach registrar to Job in Cytomine (automatically pickled by VALIS)
         registrar_path = self.registrar_path()
@@ -390,8 +391,11 @@ class VALISJob(typing.NamedTuple):
         ).upload()
 
         if self.parameters.registration_type == RegistrationType.MICRO:
-            micro_registrar, _ = registrar.register_micro()
+            with no_output():
+                micro_registrar, _ = registrar.register_micro()
             micro_registrar_path = self.registrar_path("micro")
+
+            self.logger.info("micro registration done")
 
             # pickle it
             with open(micro_registrar_path, "wb") as micro_registrar_dest:
@@ -465,16 +469,28 @@ class VALISJob(typing.NamedTuple):
             # get annotation geometry
             geometry = shapely.wkt.loads(annotation.location)
 
-            warped_geometry = shapely.wkt.dumps(
-                transform(functools.partial(warper, slide), geometry)
+            # convert to top-left coordinate
+            geometry = affine_transform(
+                geometry, [1, 0, 0, -1, 0, image.height]
             )
+
+            # warp points
+            geometry = transform(functools.partial(warper, slide), geometry)
+
             for img in dest_imgs:
                 if img.id == annotation.image:
                     continue  # avoid duplicate annotations
 
+                # convert back to bottom-left coordinate
+                geometry = affine_transform(
+                    geometry, [1, 0, 0, -1, 0, img.height]
+                )
+
+                geometry_str = shapely.wkt.dumps(geometry)
+
                 annotations.append(
                     models.Annotation(
-                        warped_geometry,
+                        geometry_str,
                         img.id,
                         annotation.term,
                         annotation.project,
