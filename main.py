@@ -107,7 +107,8 @@ class JobParameters(typing.NamedTuple):
     registration_type: RegistrationType
     compose_non_rigid: bool
 
-    # TODO: pixel dims for registration (defines how scaled down they are)
+    # pixel dims for registration (defines how scaled down they are)
+    micro_reg_max_dim_px: typing.Optional[int]
 
     # TODO: either select all userAnnotation in a project
     #   or select all annotations from a list of users (and filter by images)
@@ -150,6 +151,19 @@ class JobParameters(typing.NamedTuple):
         compose_non_rigid = False
         if has("compose_non_rigid"):
             compose_non_rigid = eb(namespace.compose_non_rigid)
+
+        micro_reg_max_dim_px = None
+        if has("micro_reg_max_dim_px"):
+            micro_reg_max_dim_px = ei(namespace.micro_reg_max_dim_px)
+
+        if (
+            micro_reg_max_dim_px is not None
+            and registration_type != RegistrationType.MICRO
+        ):
+            raise ValueError(
+                "can only specify MICRO_REG_MAX_DIM if "
+                "REGISTRATION_TYPE is 'micro'"
+            )
 
         annotation_to_map_ids = []
         if has("annotation_to_map"):
@@ -202,6 +216,7 @@ class JobParameters(typing.NamedTuple):
             # check_for_reflections=check_for_reflections,
             registration_type=registration_type,
             compose_non_rigid=compose_non_rigid,
+            micro_reg_max_dim_px=micro_reg_max_dim_px,
             annotations_to_map=[ann_cache[id] for id in annotation_to_map_ids],
             images_to_warp=[img_cache[idx] for idx in images_to_warp_ids],
             map_annotations_to_warped_images=map_annotations_to_warped_images,
@@ -395,7 +410,12 @@ class VALISJob(typing.NamedTuple):
 
         if self.parameters.registration_type == RegistrationType.MICRO:
             with no_output():
-                micro_registrar, _ = registrar.register_micro()
+                if self.parameters.micro_reg_max_dim_px is not None:
+                    micro_registrar, _ = registrar.register_micro(
+                        max_non_rigid_registartion_dim_px=self.parameters.micro_reg_max_dim_px
+                    )
+                else:
+                    micro_registrar, _ = registrar.register_micro()
             micro_registrar_path = self.registrar_path("micro")
 
             self.logger.info("micro registration done")
@@ -473,9 +493,7 @@ class VALISJob(typing.NamedTuple):
             geometry = shapely.wkt.loads(annotation.location)
 
             # convert to top-left coordinate
-            geometry = affine_transform(
-                geometry, [1, 0, 0, -1, 0, image.height]
-            )
+            geometry = affine_transform(geometry, [1, 0, 0, -1, 0, image.height])
 
             # warp points
             geometry = transform(functools.partial(warper, slide), geometry)
@@ -485,9 +503,7 @@ class VALISJob(typing.NamedTuple):
                     continue  # avoid duplicate annotations
 
                 # convert back to bottom-left coordinate
-                geometry = affine_transform(
-                    geometry, [1, 0, 0, -1, 0, img.height]
-                )
+                geometry = affine_transform(geometry, [1, 0, 0, -1, 0, img.height])
 
                 geometry_str = shapely.wkt.dumps(geometry)
 
