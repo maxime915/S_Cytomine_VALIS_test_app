@@ -342,7 +342,10 @@ class VALISJob(typing.NamedTuple):
         # TODO can this be parallelized ?
 
         for image in self.parameters.all_images:
-            status = image.download(self.get_image_path(image), override=False)
+            dest_path = self.get_image_path(image)
+            if pathlib.Path(dest_path).exists():
+                continue
+            status = image.download(dest_path, override=False)
             if not status:
                 raise ValueError(f"image with ID {image.id} could not be downloaded")
 
@@ -383,12 +386,12 @@ class VALISJob(typing.NamedTuple):
 
         # attach registrar to Job in Cytomine (automatically pickled by VALIS)
         registrar_path = self.registrar_path()
-        models.AttachedFile(
-            self.cytomine_job.job,
-            domainIndent=self.cytomine_job.job.id,
-            filename=registrar_path,
-            domainClassName="be.cytomine.processing.Job",
-        ).upload()
+        # models.AttachedFile(
+        #     self.cytomine_job.job,
+        #     domainIndent=self.cytomine_job.job.id,
+        #     filename=registrar_path,
+        #     domainClassName="be.cytomine.processing.Job",
+        # ).upload()
 
         if self.parameters.registration_type == RegistrationType.MICRO:
             with no_output():
@@ -401,12 +404,12 @@ class VALISJob(typing.NamedTuple):
             with open(micro_registrar_path, "wb") as micro_registrar_dest:
                 pickle.dump(micro_registrar, micro_registrar_dest)
 
-            models.AttachedFile(
-                self.cytomine_job.job,
-                domainIndent=self.cytomine_job.job.id,
-                filename=micro_registrar_path,
-                domainClassName="be.cytomine.processing.Job",
-            ).upload()
+            # models.AttachedFile(
+            #     self.cytomine_job.job,
+            #     domainIndent=self.cytomine_job.job.id,
+            #     filename=micro_registrar_path,
+            #     domainClassName="be.cytomine.processing.Job",
+            # ).upload()
 
         return rigid_registrar, non_rigid_registrar, micro_registrar
 
