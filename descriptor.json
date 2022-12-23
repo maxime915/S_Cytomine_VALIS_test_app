@@ -67,8 +67,8 @@
         },
         {
             "id": "image_crop",
-            "name": "Cropping modes for all images",
-            "description": "How to define the registration domain relative to all images. 'reference' defines the reference image as the domain, 'overlap' means the common area only, 'all' means the smallest area to include all images.",
+            "name": "Cropping modes for all images [see info]",
+            "description": "How to define the registration domain relative to all images. One of: 'reference' (defines the reference image as the domain), 'overlap' (means the common area only), 'all' (means the smallest area to include all images).",
             "type": "String",
             "optional": false,
             "value-key": "@ID",
@@ -93,8 +93,8 @@
         },
         {
             "id": "image_ordering",
-            "name": "Image ordering",
-            "description": "How to order the images before doing the registration (useful for 3D registration)",
+            "name": "Image ordering [see info]",
+            "description": "How to order the images before doing the registration (useful for 3D registration). One of: 'auto' (default, meaning that the order doesn't matter), 'name' (to be ordered by filename), 'created' (to be ordered by addition date to Cytomine)",
             "type": "String",
             "optional": true,
             "value-choices": [
@@ -109,7 +109,7 @@
         {
             "id": "align_toward_reference",
             "name": "Align Toward Reference",
-            "description": "Align images toward the reference, rather that directly to the reference. Meaningless for 2 images problems, see VALIS documentation for more info.",
+            "description": "Align images toward the reference, rather that directly to the reference. Meaningless if fewer than 3 images, see VALIS documentation for more info.",
             "type": "Boolean",
             "optional": true,
             "default": true,
@@ -119,7 +119,7 @@
         {
             "id": "check_for_reflections",
             "name": "Check for reflections",
-            "description": "Check for reflections in the image. Costly parameters, so best done by hand if possible",
+            "description": "Check for reflections in the image. May incur a consequent cost.",
             "type": "Boolean",
             "optional": true,
             "default": false,
@@ -128,8 +128,8 @@
         },
         {
             "id": "registration_type",
-            "name": "Registration Type",
-            "description": "The type of registration performed by VALIS",
+            "name": "Registration Type [see info]",
+            "description": "The type of registration performed by VALIS. One of 'rigid' (using affine transformations on lower resolution versions), 'non-rigid' (using non-rigid deformations on lower resolution version), 'micro' (using non-rigid deformations on higher resolution, tunable using MICRO_REG_MAX_DIM_PX).",
             "type": "String",
             "optional": true,
             "value-choices": [
@@ -144,7 +144,7 @@
         {
             "id": "compose_non_rigid",
             "name": "Compose using non rigid deformation",
-            "description": "May be useful to bring ...",
+            "description": "See VALIS documentation for more info",
             "type": "Boolean",
             "optional": true,
             "default": false,
@@ -166,8 +166,8 @@
         },
         {
             "id": "images_to_warp",
-            "name": "Images to warp",
-            "description": "All Images that should be deformed to match the reference (it may be useful to select the reference if 'crop' is not 'reference')",
+            "name": "Images to deform and upload",
+            "description": "All Images that should be deformed to match the reference and uploaded to the same project",
             "type": "ListDomain",
             "uri": "/api/project/$currentProject$/imageinstance.json",
             "uri-print-attribute": "instanceFilename",
@@ -180,7 +180,7 @@
         {
             "id": "map_annotations_to_warped_images",
             "name": "Map annotations to warped images",
-            "description": "If true, map annotation to the newly warped images",
+            "description": "In addition to the reference image, also map annotation to the deformed and uploaded images",
             "type": "Boolean",
             "optional": true,
             "default": true,
