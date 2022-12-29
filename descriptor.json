@@ -142,13 +142,14 @@
             "command-line-flag": "--@id"
         },
         {
-            "id":"micro_reg_max_dim_px",
-            "name":"Maximum dimension for micro registration",
+            "id": "micro_reg_max_dim_px",
+            "name": "Maximum dimension for micro registration",
             "description": "Maximum dimension (in pixel) for any image during the micro registration step. It is an error to specify this value if REGISTRATION_TYPE is not 'micro'",
-            "type":"Number",
+            "type": "Number",
             "integer": true,
-            "value-key":"@ID",
-            "command-line-flag":"--@id"
+            "optional": true,
+            "value-key": "@ID",
+            "command-line-flag": "--@id"
         },
         {
             "id": "compose_non_rigid",
