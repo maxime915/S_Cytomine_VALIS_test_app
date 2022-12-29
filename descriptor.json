@@ -6,7 +6,7 @@
         "type": "singularity"
     },
     "schema-version": "cytomine-0.1",
-    "command-line": "CYTOMINE_HOST CYTOMINE_PUBLIC_KEY CYTOMINE_PRIVATE_KEY CYTOMINE_ID_PROJECT CYTOMINE_ID_SOFTWARE ALL_IMAGES IMAGE_CROP REFERENCE_IMAGE IMAGE_ORDERING ALIGN_TOWARD_REFERENCE CHECK_FOR_REFLECTIONS REGISTRATION_TYPE MICRO_REG_MAX_DIM_PX COMPOSE_NON_RIGID ANNOTATION_TO_MAP IMAGES_TO_WARP CYTOMINE_UPLOAD_HOST MAP_ANNOTATIONS_TO_WARPED_IMAGES",
+    "command-line": "CYTOMINE_HOST CYTOMINE_PUBLIC_KEY CYTOMINE_PRIVATE_KEY CYTOMINE_ID_PROJECT CYTOMINE_ID_SOFTWARE ALL_IMAGES IMAGE_CROP REFERENCE_IMAGE IMAGE_ORDERING ALIGN_TOWARD_REFERENCE REGISTRATION_TYPE MICRO_REG_MAX_DIM_PX COMPOSE_NON_RIGID ANNOTATION_TO_MAP IMAGES_TO_WARP CYTOMINE_UPLOAD_HOST MAP_ANNOTATIONS_TO_WARPED_IMAGES",
     "inputs": [
         {
             "id": "cytomine_host",
@@ -113,16 +113,6 @@
             "type": "Boolean",
             "optional": true,
             "default": true,
-            "value-key": "@ID",
-            "command-line-flag": "--@id"
-        },
-        {
-            "id": "check_for_reflections",
-            "name": "Check for reflections",
-            "description": "Check for reflections in the image. May incur a consequent cost. (currently ignored because of version mismatch between VALIS and Cytomine dependencies)",
-            "type": "Boolean",
-            "optional": true,
-            "default": false,
             "value-key": "@ID",
             "command-line-flag": "--@id"
         },

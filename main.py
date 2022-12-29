@@ -103,7 +103,6 @@ class JobParameters(typing.NamedTuple):
     image_ordering: ImageOrdering
     align_toward_reference: bool
     image_crop: ImageCrop
-    # check_for_reflections: bool  # FIXME depends on the version of Valis
     registration_type: RegistrationType
     compose_non_rigid: bool
 
@@ -139,11 +138,6 @@ class JobParameters(typing.NamedTuple):
             align_toward_reference = eb(namespace.align_toward_reference)
 
         image_crop = ImageCrop(namespace.image_crop)
-
-        # FIXME Valis version mismatch after env solve
-        # check_for_reflections = False
-        # if has("check_for_reflections"):
-        #     check_for_reflections = eb(namespace.check_for_reflections)
 
         registration_type = RegistrationType.NON_RIGID
         if has("registration_type"):
@@ -223,7 +217,6 @@ class JobParameters(typing.NamedTuple):
             image_ordering=image_ordering,
             align_toward_reference=align_toward_reference,
             image_crop=image_crop,
-            # check_for_reflections=check_for_reflections,
             registration_type=registration_type,
             compose_non_rigid=compose_non_rigid,
             micro_reg_max_dim_px=micro_reg_max_dim_px,
@@ -335,7 +328,6 @@ class VALISJob(typing.NamedTuple):
             "compose_non_rigid": self.parameters.compose_non_rigid,
             "align_to_reference": not self.parameters.align_toward_reference,
             "crop": self.parameters.image_crop.value,
-            # "check_for_reflections": self.parameters.check_for_reflections,
         }
 
         # skip non rigid registrations
