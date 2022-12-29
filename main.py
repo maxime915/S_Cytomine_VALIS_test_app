@@ -114,6 +114,7 @@ class JobParameters(typing.NamedTuple):
     #   or select all annotations from a list of users (and filter by images)
     annotations_to_map: typing.List[models.Annotation]
     images_to_warp: typing.List[models.ImageInstance]
+    upload_host: typing.Optional[str]
     map_annotations_to_warped_images: bool
 
     @staticmethod
@@ -161,8 +162,7 @@ class JobParameters(typing.NamedTuple):
             and registration_type != RegistrationType.MICRO
         ):
             raise ValueError(
-                "can only specify MICRO_REG_MAX_DIM if "
-                "REGISTRATION_TYPE is 'micro'"
+                "can only specify MICRO_REG_MAX_DIM if " "REGISTRATION_TYPE is 'micro'"
             )
 
         annotation_to_map_ids = []
@@ -174,6 +174,16 @@ class JobParameters(typing.NamedTuple):
         images_to_warp_ids = []
         if has("images_to_warp"):
             images_to_warp_ids = [ei(i) for i in namespace.images_to_warp.split(",")]
+
+        upload_host = None
+        if has("cytomine_upload_host"):
+            upload_host = namespace.cytomine_upload_host
+
+        if images_to_warp_ids and not upload_host:
+            raise ValueError(
+                "must submit 'cytomine_upload_host' if there are "
+                "images to deform and upload"
+            )
 
         map_annotations_to_warped_images = False
         if has("map_annotations_to_warped_images"):
@@ -219,6 +229,7 @@ class JobParameters(typing.NamedTuple):
             micro_reg_max_dim_px=micro_reg_max_dim_px,
             annotations_to_map=[ann_cache[id] for id in annotation_to_map_ids],
             images_to_warp=[img_cache[idx] for idx in images_to_warp_ids],
+            upload_host=upload_host,
             map_annotations_to_warped_images=map_annotations_to_warped_images,
         )
 
@@ -525,8 +536,6 @@ class VALISJob(typing.NamedTuple):
             uploaded_images: typing.List[models.ImageInstance] = []
             return uploaded_images
 
-        # TODO add upload_host as a parameter
-
         # get storage
         userJob = models.UserJob().fetch(id=self.cytomine_job.job.userJob)
         all_storage = models.StorageCollection().fetch()
@@ -550,7 +559,7 @@ class VALISJob(typing.NamedTuple):
 
         for path_dst in warped_images:
             uf = self.cytomine_job.upload_image(
-                upload_host="https://research-upload.cytomine.be/",
+                upload_host=self.parameters.upload_host,
                 filename=path_dst,
                 id_storage=user_storage.id,
                 id_project=self.cytomine_job.project.id,

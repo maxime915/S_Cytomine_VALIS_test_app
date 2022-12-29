@@ -6,7 +6,7 @@
         "type": "singularity"
     },
     "schema-version": "cytomine-0.1",
-    "command-line": "CYTOMINE_HOST CYTOMINE_PUBLIC_KEY CYTOMINE_PRIVATE_KEY CYTOMINE_ID_PROJECT CYTOMINE_ID_SOFTWARE ALL_IMAGES IMAGE_CROP REFERENCE_IMAGE IMAGE_ORDERING ALIGN_TOWARD_REFERENCE CHECK_FOR_REFLECTIONS REGISTRATION_TYPE MICRO_REG_MAX_DIM_PX COMPOSE_NON_RIGID ANNOTATION_TO_MAP IMAGES_TO_WARP MAP_ANNOTATIONS_TO_WARPED_IMAGES",
+    "command-line": "CYTOMINE_HOST CYTOMINE_PUBLIC_KEY CYTOMINE_PRIVATE_KEY CYTOMINE_ID_PROJECT CYTOMINE_ID_SOFTWARE ALL_IMAGES IMAGE_CROP REFERENCE_IMAGE IMAGE_ORDERING ALIGN_TOWARD_REFERENCE CHECK_FOR_REFLECTIONS REGISTRATION_TYPE MICRO_REG_MAX_DIM_PX COMPOSE_NON_RIGID ANNOTATION_TO_MAP IMAGES_TO_WARP CYTOMINE_UPLOAD_HOST MAP_ANNOTATIONS_TO_WARPED_IMAGES",
     "inputs": [
         {
             "id": "cytomine_host",
@@ -177,11 +177,20 @@
         {
             "id": "images_to_warp",
             "name": "Images to deform and upload",
-            "description": "All Images that should be deformed to match the reference and uploaded to the same project",
+            "description": "All Images that should be deformed to match the reference and uploaded to the same project. Must also specify CYTOMINE_UPLOAD_HOST if there are images to deform and upload.",
             "type": "ListDomain",
             "uri": "/api/project/$currentProject$/imageinstance.json",
             "uri-print-attribute": "instanceFilename",
             "uri-sort-attribute": "instanceFilename",
+            "optional": true,
+            "default": "",
+            "value-key": "@ID",
+            "command-line-flag": "--@id"
+        },
+        {
+            "id": "cytomine_upload_host",
+            "name": "Cytomine upload host where the images should be uploaded to. Mandatory if there are images to deform and upload",
+            "type": "String",
             "optional": true,
             "default": "",
             "value-key": "@ID",
