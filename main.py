@@ -542,7 +542,7 @@ class VALISJob(typing.NamedTuple):
             slide: registration.Slide = registrar.get_slide(path_src)
             with no_output():
                 # remove progress bar
-                slide.warp_and_save_slide(path_dst)
+                slide.warp_and_save_slide(path_dst, tile_wh=1024)
             self.logger.info("warped %s", path_dst)
 
             warped_images.append(path_dst)
