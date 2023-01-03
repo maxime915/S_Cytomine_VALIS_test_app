@@ -439,15 +439,15 @@ class VALISJob(typing.NamedTuple):
     def warp_annotations(
         self,
         registrar: registration.Valis,
-        dest_imgs: typing.Optional[typing.Iterable[models.ImageInstance]] = None,
+        to_images: typing.Optional[typing.Iterable[models.ImageInstance]] = None,
         to_reference: bool = False,
     ):
-        if to_reference and dest_imgs:
+        if to_reference and to_images:
             raise ValueError(
                 "cannot warp the annotation to the reference and \
                 other images in a single call to warp_annotations"
             )
-        if not to_reference and not dest_imgs:
+        if not to_reference and not to_images:
             raise ValueError("either to_reference is True, or dest_imgs is non empty")
 
         if not self.parameters.annotations_to_map:
@@ -464,13 +464,13 @@ class VALISJob(typing.NamedTuple):
         image_cache = {int(img.id): img for img in self.parameters.all_images}
 
         if to_reference:
-            dest_imgs = [reference_image]
+            to_images = [reference_image]
         else:
-            for idx, img in enumerate(dest_imgs):
+            for idx, img in enumerate(to_images):
                 if not isinstance(img, (models.ImageInstance)):
                     raise ValueError(f"img at {idx=} is not an ImageInstance")
 
-            if any(img.id in image_cache for img in dest_imgs):
+            if any(img.id in image_cache for img in to_images):
                 raise ValueError(
                     "when warping to non-reference image, only \
                     new images are supported"
@@ -501,14 +501,14 @@ class VALISJob(typing.NamedTuple):
             # warp points
             geometry = transform(functools.partial(warper, slide), geometry)
 
-            for img in dest_imgs:
+            for img in to_images:
                 if img.id == annotation.image:
                     continue  # avoid duplicate annotations
 
                 # convert back to bottom-left coordinate
-                geometry = affine_transform(geometry, [1, 0, 0, -1, 0, img.height])
+                geometry_local = affine_transform(geometry, [1, 0, 0, -1, 0, img.height])
 
-                geometry_str = shapely.wkt.dumps(geometry)
+                geometry_str = shapely.wkt.dumps(geometry_local)
 
                 annotations.append(
                     models.Annotation(
