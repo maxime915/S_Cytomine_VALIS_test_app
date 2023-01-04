@@ -179,7 +179,8 @@
         },
         {
             "id": "cytomine_upload_host",
-            "name": "Cytomine upload host where the images should be uploaded to. Mandatory if there are images to deform and upload",
+            "name": "Cytomine upload host",
+            "description": "Cytomine upload host where the images should be uploaded to. Mandatory if there are images to deform and upload.",
             "type": "String",
             "optional": true,
             "default": "",
