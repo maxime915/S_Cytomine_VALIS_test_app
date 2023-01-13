@@ -109,8 +109,6 @@ class JobParameters(typing.NamedTuple):
     # pixel dims for registration (defines how scaled down they are)
     micro_reg_max_dim_px: typing.Optional[int]
 
-    # TODO: either select all userAnnotation in a project
-    #   or select all annotations from a list of users (and filter by images)
     annotations_to_map: typing.List[models.Annotation]
     images_to_warp: typing.List[models.ImageInstance]
     upload_host: typing.Optional[str]
@@ -193,7 +191,6 @@ class JobParameters(typing.NamedTuple):
                 "all images to warp should be part of the registration sequence"
             )
 
-        # TODO how to fetch a list of ids in O(1) requests ?
         all_images_in_project = models.ImageInstanceCollection().fetch_with_filter(
             "project", project.id
         )
@@ -403,7 +400,7 @@ class VALISJob(typing.NamedTuple):
         self.logger.info("non-micro registration done")
 
         # attach registrar to Job in Cytomine (automatically pickled by VALIS)
-        registrar_path = self.registrar_path()
+        # registrar_path = self.registrar_path()
         # models.AttachedFile(
         #     self.cytomine_job.job,
         #     domainIndent=self.cytomine_job.job.id,
@@ -419,13 +416,13 @@ class VALISJob(typing.NamedTuple):
                     )
                 else:
                     micro_registrar, _ = registrar.register_micro()
-            micro_registrar_path = self.registrar_path("micro")
+            # micro_registrar_path = self.registrar_path("micro")
 
             self.logger.info("micro registration done")
 
-            # pickle it
-            with open(micro_registrar_path, "wb") as micro_registrar_dest:
-                pickle.dump(micro_registrar, micro_registrar_dest)
+            # # pickle it
+            # with open(micro_registrar_path, "wb") as micro_registrar_dest:
+            #     pickle.dump(micro_registrar, micro_registrar_dest)
 
             # models.AttachedFile(
             #     self.cytomine_job.job,
@@ -555,6 +552,7 @@ class VALISJob(typing.NamedTuple):
                 filename=path_dst,
                 id_storage=user_storage.id,
                 id_project=self.cytomine_job.project.id,
+                sync=True,
             )
             if not uf:
                 self.logger.error("failed to upload image %s", path_dst)
