@@ -1,6 +1,6 @@
 {
     "name": "Cytomine_VALIS_test_app",
-    "description": "A demo Cytomine app to display how to register images using VALIS",
+    "description": "Cytomine App for VALIS that can register multiple images, and map annotations between them",
     "container-image": {
         "image": "mamodeiuliege/s_cytomine_valis_test_app",
         "type": "singularity"
@@ -77,6 +77,7 @@
                 "overlap",
                 "all"
             ],
+            "default-value": "all",
             "command-line-flag": "--@id"
         },
         {
@@ -102,7 +103,7 @@
                 "name",
                 "created"
             ],
-            "default": "auto",
+            "default-value": "auto",
             "value-key": "@ID",
             "command-line-flag": "--@id"
         },
@@ -112,7 +113,7 @@
             "description": "Align images toward the reference, rather that directly to the reference. Meaningless if fewer than 3 images, see VALIS documentation for more info.",
             "type": "Boolean",
             "optional": true,
-            "default": true,
+            "default-value": true,
             "value-key": "@ID",
             "command-line-flag": "--@id"
         },
@@ -127,7 +128,7 @@
                 "non-rigid",
                 "micro"
             ],
-            "default": "non-rigid",
+            "default-value": "non-rigid",
             "value-key": "@ID",
             "command-line-flag": "--@id"
         },
@@ -147,7 +148,7 @@
             "description": "See VALIS documentation for more info",
             "type": "Boolean",
             "optional": true,
-            "default": false,
+            "default-value": false,
             "value-key": "@ID",
             "command-line-flag": "--@id"
         },
@@ -160,7 +161,7 @@
             "uri-print-attribute": "id",
             "uri-sort-attribute": "id",
             "optional": true,
-            "default": "",
+            "default-value": "",
             "value-key": "@ID",
             "command-line-flag": "--@id"
         },
@@ -173,7 +174,7 @@
             "uri-print-attribute": "instanceFilename",
             "uri-sort-attribute": "instanceFilename",
             "optional": true,
-            "default": "",
+            "default-value": "",
             "value-key": "@ID",
             "command-line-flag": "--@id"
         },
@@ -183,7 +184,7 @@
             "description": "Cytomine upload host where the images should be uploaded to. Mandatory if there are images to deform and upload.",
             "type": "String",
             "optional": true,
-            "default": "",
+            "default-value": "",
             "value-key": "@ID",
             "command-line-flag": "--@id"
         },
@@ -193,7 +194,7 @@
             "description": "In addition to the reference image, also map annotation to the deformed and uploaded images",
             "type": "Boolean",
             "optional": true,
-            "default": true,
+            "default-value": true,
             "value-key": "@ID",
             "command-line-flag": "--@id"
         }
