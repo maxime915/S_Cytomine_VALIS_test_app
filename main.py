@@ -503,7 +503,9 @@ class VALISJob(typing.NamedTuple):
                     continue  # avoid duplicate annotations
 
                 # convert back to bottom-left coordinate
-                geometry_local = affine_transform(geometry, [1, 0, 0, -1, 0, img.height])
+                geometry_local = affine_transform(
+                    geometry, [1, 0, 0, -1, 0, img.height]
+                )
 
                 geometry_str = shapely.wkt.dumps(geometry_local)
 
@@ -591,12 +593,16 @@ class VALISJob(typing.NamedTuple):
 
             try:
                 return [images_by_base[idx] for idx in base_ids]
-            except KeyError:
+            except KeyError as e:
+                self.logger.exception(e)
                 return None
 
         lst = retry(_get_lst)
-        if not lst:
+        if lst is None:
             raise ValueError("impossible to fetch the list of images")
+        
+        if len(lst) == 0:
+            raise ValueError("fetched empty list of images")
 
         return lst
 
