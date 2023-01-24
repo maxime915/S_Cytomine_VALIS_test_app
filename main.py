@@ -292,29 +292,34 @@ class VALISJob(typing.NamedTuple):
 
             self.update(2, "Downloading all images")
             self.download_all_images()
-            self.update(20, "Downloaded images")
+            self.update(19, "Downloaded images")
 
             self.update(20, "Creating registrar")
             # NOTE Valis doesn't allow 'lazy' folders: the images must be downloaded before creating the registrar
             registrar = registration.Valis(**self.get_valis_args())
             self.update(21, "Created registrar")
 
-            self.update(21, "Registering all images")
+            self.update(22, "Registering all images")
             self.register(registrar)
-            self.update(60, "Registered all images")
+            self.update(59, "Registered all images")
 
             self.update(60, "Warping all annotations")
             self.warp_annotations(registrar, to_reference=True)
-            self.update(70, "Warped all annotations")
+            self.update(69, "Warped all annotations")
 
             self.update(70, "Warping images")
             img_lst = self.warp_images(registrar)
-            self.update(89, "Warped all images")
 
-            if self.parameters.map_annotations_to_warped_images:
-                self.update(89, "Warping annotations to uploaded images")
+            if (
+                self.parameters.map_annotations_to_warped_images
+                and self.parameters.images_to_warp
+            ):
+                self.update(89, "Warped all images")
+                self.update(90, "Warping annotations to uploaded images")
                 self.warp_annotations(registrar, img_lst)
                 self.update(99, "Warped all annotations to uploaded images")
+            else:
+                self.update(99, "Warped all images")
 
     def get_valis_args(self):
         valis_args = {
@@ -600,7 +605,7 @@ class VALISJob(typing.NamedTuple):
         lst = retry(_get_lst)
         if lst is None:
             raise ValueError("impossible to fetch the list of images")
-        
+
         if len(lst) == 0:
             raise ValueError("fetched empty list of images")
 
