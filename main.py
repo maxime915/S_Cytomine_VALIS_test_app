@@ -62,8 +62,8 @@ def retry(
     fun: typing.Callable[[], typing.Optional[RetType]],
     delay: float = 1.0,
     max_retry: int = 5,
-    call_back: typing.Callable[[int], None] = None,
-):
+    call_back: typing.Optional[typing.Callable[[int], None]] = None,
+) -> typing.Optional[RetType]:
     "retry if the result of fun is None"
 
     for retry_ in range(max_retry):
@@ -107,7 +107,8 @@ class JobParameters(typing.NamedTuple):
     compose_non_rigid: bool
 
     # pixel dims for registration (defines how scaled down they are)
-    micro_reg_max_dim_px: typing.Optional[int]
+    max_proc_size: int
+    micro_max_proc_size: int
 
     annotations_to_map: typing.List[models.Annotation]
     images_to_warp: typing.List[models.ImageInstance]
@@ -145,17 +146,21 @@ class JobParameters(typing.NamedTuple):
         if has("compose_non_rigid"):
             compose_non_rigid = eb(namespace.compose_non_rigid)
 
-        micro_reg_max_dim_px = None
-        if has("micro_reg_max_dim_px"):
-            micro_reg_max_dim_px = ei(namespace.micro_reg_max_dim_px)
+        max_proc_size = registration.DEFAULT_MAX_PROCESSED_IMG_SIZE
+        if has("max_proc_size"):
+            max_proc_size = ei(namespace.max_proc_size)
 
-        if (
-            micro_reg_max_dim_px is not None
-            and registration_type != RegistrationType.MICRO
-        ):
-            raise ValueError(
-                "can only specify MICRO_REG_MAX_DIM if " "REGISTRATION_TYPE is 'micro'"
-            )
+        micro_max_proc_size = registration.DEFAULT_MAX_NON_RIGID_REG_SIZE
+        if registration_type != RegistrationType.MICRO:
+            micro_max_proc_size = registration.DEFAULT_MAX_PROCESSED_IMG_SIZE
+        if has("micro_max_proc_size"):
+            micro_max_proc_size = ei(namespace.micro_max_proc_size)
+
+        if max_proc_size <= 0:
+            raise ValueError(f"{max_proc_size=} <= 0")
+
+        if micro_max_proc_size < max_proc_size:
+            raise ValueError(f"{micro_max_proc_size=} < {max_proc_size=}")
 
         annotation_to_map_ids = []
         if has("annotation_to_map"):
@@ -194,6 +199,8 @@ class JobParameters(typing.NamedTuple):
         all_images_in_project = models.ImageInstanceCollection().fetch_with_filter(
             "project", project.id
         )
+        if not all_images_in_project:
+            raise ValueError("unable to fetch all images")
         all_annotations_in_project = models.AnnotationCollection()
         all_annotations_in_project.project = project.id
         all_annotations_in_project.showWKT = True
@@ -216,7 +223,8 @@ class JobParameters(typing.NamedTuple):
             image_crop=image_crop,
             registration_type=registration_type,
             compose_non_rigid=compose_non_rigid,
-            micro_reg_max_dim_px=micro_reg_max_dim_px,
+            max_proc_size=max_proc_size,
+            micro_max_proc_size=micro_max_proc_size,
             annotations_to_map=[ann_cache[id] for id in annotation_to_map_ids],
             images_to_warp=[img_cache[idx] for idx in images_to_warp_ids],
             upload_host=upload_host,
@@ -330,6 +338,9 @@ class VALISJob(typing.NamedTuple):
             "compose_non_rigid": self.parameters.compose_non_rigid,
             "align_to_reference": not self.parameters.align_toward_reference,
             "crop": self.parameters.image_crop.value,
+            "max_image_dim_px": self.parameters.max_proc_size,
+            "max_processed_image_dim_px": self.parameters.max_proc_size,
+            "max_non_rigid_registartion_dim_px": self.parameters.max_proc_size,
         }
 
         # skip non rigid registrations
@@ -415,9 +426,9 @@ class VALISJob(typing.NamedTuple):
 
         if self.parameters.registration_type == RegistrationType.MICRO:
             with no_output():
-                if self.parameters.micro_reg_max_dim_px is not None:
+                if self.parameters.micro_max_proc_size is not None:
                     micro_registrar, _ = registrar.register_micro(
-                        max_non_rigid_registartion_dim_px=self.parameters.micro_reg_max_dim_px
+                        max_non_rigid_registartion_dim_px=self.parameters.micro_max_proc_size
                     )
                 else:
                     micro_registrar, _ = registrar.register_micro()
