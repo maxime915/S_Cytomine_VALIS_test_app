@@ -1,11 +1,9 @@
 import contextlib
 import datetime
 import enum
-import functools
 import logging
 import os
 import pathlib
-import pickle
 import sys
 import time
 import typing
@@ -303,7 +301,8 @@ class VALISJob(typing.NamedTuple):
             self.update(19, "Downloaded images")
 
             self.update(20, "Creating registrar")
-            # NOTE Valis doesn't allow 'lazy' folders: the images must be downloaded before creating the registrar
+            # NOTE Valis doesn't allow 'lazy' folders: \
+                # the images must be downloaded before creating the registrar
             registrar = registration.Valis(**self.get_valis_args())
             self.update(21, "Created registrar")
 
@@ -423,15 +422,6 @@ class VALISJob(typing.NamedTuple):
         self.logger.info("non-micro registration done")
         self.logger.info("reference image: %s", registrar.reference_img_f)
 
-        # attach registrar to Job in Cytomine (automatically pickled by VALIS)
-        # registrar_path = self.registrar_path()
-        # models.AttachedFile(
-        #     self.cytomine_job.job,
-        #     domainIndent=self.cytomine_job.job.id,
-        #     filename=registrar_path,
-        #     domainClassName="be.cytomine.processing.Job",
-        # ).upload()
-
         if self.parameters.registration_type == RegistrationType.MICRO:
             with no_output():
                 if self.parameters.micro_max_proc_size is not None:
@@ -440,20 +430,8 @@ class VALISJob(typing.NamedTuple):
                     )
                 else:
                     micro_registrar, _ = registrar.register_micro()
-            # micro_registrar_path = self.registrar_path("micro")
 
             self.logger.info("micro registration done")
-
-            # # pickle it
-            # with open(micro_registrar_path, "wb") as micro_registrar_dest:
-            #     pickle.dump(micro_registrar, micro_registrar_dest)
-
-            # models.AttachedFile(
-            #     self.cytomine_job.job,
-            #     domainIndent=self.cytomine_job.job.id,
-            #     filename=micro_registrar_path,
-            #     domainClassName="be.cytomine.processing.Job",
-            # ).upload()
 
         return rigid_registrar, non_rigid_registrar, micro_registrar
 
@@ -510,7 +488,8 @@ class VALISJob(typing.NamedTuple):
 
         # NOTE need to update when downloading at a lower resolution
         # src_shape = image_shape(self.get_thumb_path(src_image))
-        # src_geometry_file_tl = affine_transform(src_geometry_tl,[src_shape[0] / src_image.width,0,0,src_shape[1] / src_image.height,0,0])
+        # src_geometry_file_tl = affine_transform(src_geometry_tl,[src_shape[0] / \
+            # src_image.width,0,0,src_shape[1] / src_image.height,0,0])
         src_geometry_file_tl = src_geometry_tl
 
         def warper_(x, y, z=None):
@@ -524,7 +503,8 @@ class VALISJob(typing.NamedTuple):
 
         # NOTE need to update when downloading at a lower resolution
         # dst_shape = image_shape(self.get_thumb_path(dst_image))
-        # dst_geometry_tl = affine_transform(dst_geometry_file_tl,[dst_image.width / dst_shape[0],0,0,dst_image.height / dst_shape[1],0,0])
+        # dst_geometry_tl = affine_transform(dst_geometry_file_tl,[dst_image.width \
+            # / dst_shape[0],0,0,dst_image.height / dst_shape[1],0,0])
         dst_geometry_tl = dst_geometry_file_tl
         dst_geometry_bl = affine_transform(
             dst_geometry_tl, [1, 0, 0, -1, 0, dst_image.height]
@@ -556,7 +536,8 @@ class VALISJob(typing.NamedTuple):
 
         # NOTE need to update when downloading at a lower resolution
         # src_shape = image_shape(self.get_thumb_path(src_image))
-        # src_geometry_file_tl = affine_transform(src_geometry_tl,[src_shape[0] / src_image.width,0,0,src_shape[1] / src_image.height,0,0])
+        # src_geometry_file_tl = affine_transform(src_geometry_tl,[src_shape[0]\
+            # / src_image.width,0,0,src_shape[1] / src_image.height,0,0])
         src_geometry_file_tl = src_geometry_tl
 
         def warper_(x, y, z=None):
@@ -645,10 +626,10 @@ class VALISJob(typing.NamedTuple):
         self._map_annotations_generic(registrar, images, "to-source", image_group)
 
     def warp_images(self, registrar: registration.Valis):
+        images: typing.List[models.ImageInstance] = []
 
         if not self.parameters.images_to_warp:
-            uploaded_images: typing.List[models.ImageInstance] = []
-            return uploaded_images
+            return images
 
         # get storage
         userJob = models.UserJob().fetch(id=self.cytomine_job.job.userJob)
@@ -736,8 +717,8 @@ class VALISJob(typing.NamedTuple):
 
             try:
                 return [images_by_base[idx] for idx in base_ids]
-            except KeyError as e:
-                self.logger.exception(e)
+            except KeyError as err:
+                self.logger.exception(err)
                 return None
 
         lst = retry(_get_lst)
@@ -751,6 +732,7 @@ class VALISJob(typing.NamedTuple):
 
 
 def main(arguments):
+    "starts the job with the given CLI arguments"
     with cytomine.CytomineJob.from_cli(arguments) as job:
 
         job.job.update(
@@ -764,7 +746,7 @@ def main(arguments):
         name = "main"
 
         # check all parameters and fetch from Cytomine
-        parameters = JobParameters.check(job.parameters, job._project)
+        parameters = JobParameters.check(job.parameters, job.project)
 
         src_dir.mkdir(exist_ok=True, parents=False)
         dst_base_dir.mkdir(exist_ok=True, parents=False)
