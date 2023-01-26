@@ -349,34 +349,40 @@ class VALISJob(typing.NamedTuple):
 
         # reference image
         if self.parameters.reference_image is not None:
-            valis_args["reference_img_f"] = self.get_image_path(
-                self.parameters.reference_image
+            valis_args["reference_img_f"] = str(
+                self.src_dir / self.get_fname(self.parameters.reference_image)
             )
 
         return valis_args
 
-    def get_image_path(self, image: models.ImageInstance) -> str:
-        fname = image.filename
+    def get_fname(self, image: models.ImageInstance) -> str:
         if self.parameters.image_ordering == ImageOrdering.CREATED:
-            fname = f"{image.created}_{image.filename}"
-        return str(self.src_dir / fname)
+            return f"{image.created}_{image.filename}"
+        return image.filename
+
+    def get_thumb_path(self, image: models.ImageInstance) -> str:
+        base = self.src_dir / self.get_fname(image)
+        return str(base.with_suffix(".png"))
 
     def get_warped_image_path_ome_tiff(self, image: models.ImageInstance) -> str:
-        fname = "{app}-{utc}_{name}".format(
-            app=self.cytomine_job.software.id,
-            utc=datetime.datetime.utcnow().strftime("%Y%m%d-%H%M%S"),
+        fname = "{app}_{utc}_{name}".format(
+            app=self.cytomine_job.job.id,
+            utc=datetime.datetime.utcnow().strftime("%Y,%m,%d-%H,%M,%S"),
             name=image.filename,
         )
         return str((self.dst_dir / "saved-images" / fname).with_suffix(".ome.tiff"))
 
     def download_all_images(self):
-        # TODO can this be parallelized ?
-
         for image in self.parameters.all_images:
-            dest_path = self.get_image_path(image)
-            if pathlib.Path(dest_path).exists():
-                continue
-            status = image.download(dest_path, override=False)
+            img_path = self.get_thumb_path(image)
+            bkp = image.filename
+            try:
+                status = image.download(img_path, override=False)
+                image.filename = bkp
+            except ValueError as e:
+                raise ValueError(
+                    f"could not download image {image.path} ({image.id}) "
+                ) from e
             if not status:
                 raise ValueError(f"image with ID {image.id} could not be downloaded")
 
@@ -393,7 +399,8 @@ class VALISJob(typing.NamedTuple):
             )
 
         for image in self.parameters.all_images:
-            if self.get_image_path(image) == registrar.reference_img_f:
+            image_path = str(self.src_dir / self.get_fname(image))
+            if image_path == registrar.reference_img_f:
                 return image
 
         assert False, "The image should have been found"
@@ -414,6 +421,7 @@ class VALISJob(typing.NamedTuple):
         assert rigid_registrar is not None
 
         self.logger.info("non-micro registration done")
+        self.logger.info("reference image: %s", registrar.reference_img_f)
 
         # attach registrar to Job in Cytomine (automatically pickled by VALIS)
         # registrar_path = self.registrar_path()
@@ -470,7 +478,7 @@ class VALISJob(typing.NamedTuple):
         # warp all annotation that aren't on the reference image
 
         reference_image = self.get_reference_image(registrar)
-        reference_slide = registrar.get_slide(self.get_image_path(reference_image))
+        reference_slide = registrar.get_slide(self.get_fname(reference_image))
 
         annotations = models.AnnotationCollection()
 
@@ -503,7 +511,7 @@ class VALISJob(typing.NamedTuple):
 
         for annotation in self.parameters.annotations_to_map:
             image = image_cache[annotation.image]
-            slide: registration.Slide = registrar.get_slide(self.get_image_path(image))
+            slide: registration.Slide = registrar.get_slide(self.get_fname(image))
 
             # get annotation geometry
             geometry = shapely.wkt.loads(annotation.location)
@@ -546,15 +554,17 @@ class VALISJob(typing.NamedTuple):
         # get storage
         userJob = models.UserJob().fetch(id=self.cytomine_job.job.userJob)
         all_storage = models.StorageCollection().fetch()
+        if not all_storage:
+            raise ValueError("cannot fetch storages for this project")
         user_storage = [s for s in all_storage if s.user == userJob.user][0]
 
         # warp all images and save to disk
         warped_images: typing.List[str] = []
         for image in self.parameters.images_to_warp:
-            path_src = self.get_image_path(image)
+            fname_src = self.get_fname(image)
             path_dst = self.get_warped_image_path_ome_tiff(image)
 
-            slide: registration.Slide = registrar.get_slide(path_src)
+            slide: registration.Slide = registrar.get_slide(fname_src)
             with no_output():
                 # remove progress bar
                 slide.warp_and_save_slide(path_dst, tile_wh=1024)
@@ -580,7 +590,6 @@ class VALISJob(typing.NamedTuple):
         return self.get_image_instances(uploaded_files)
 
     def get_image_instances(self, uploaded_files: typing.List[models.UploadedFile]):
-        # IMPORTANT: API doesn't do instant modification, retry with time delay is necessary
 
         base_ids: typing.List[int] = []
         for uf in uploaded_files:
