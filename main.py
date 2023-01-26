@@ -312,7 +312,7 @@ class VALISJob(typing.NamedTuple):
             self.update(59, "Registered all images")
 
             self.update(60, "Warping all annotations")
-            self.warp_annotations(registrar, to_reference=True)
+            self.map_annotations_to_source_images(registrar, self.parameters.all_images)
             self.update(69, "Warped all annotations")
 
             self.update(70, "Warping images")
@@ -324,7 +324,7 @@ class VALISJob(typing.NamedTuple):
             ):
                 self.update(89, "Warped all images")
                 self.update(90, "Warping annotations to uploaded images")
-                self.warp_annotations(registrar, img_lst)
+                self.map_annotations_to_uploaded_images(registrar, img_lst)
                 self.update(99, "Warped all annotations to uploaded images")
             else:
                 self.update(99, "Warped all images")
@@ -457,93 +457,192 @@ class VALISJob(typing.NamedTuple):
 
         return rigid_registrar, non_rigid_registrar, micro_registrar
 
-    def warp_annotations(
-        self,
-        registrar: registration.Valis,
-        to_images: typing.Optional[typing.Iterable[models.ImageInstance]] = None,
-        to_reference: bool = False,
-    ):
-        if to_reference and to_images:
-            raise ValueError(
-                "cannot warp the annotation to the reference and \
-                other images in a single call to warp_annotations"
+    def _find_image_group(self, images: typing.Sequence[models.ImageInstance]):
+        "find an image group with all given images"
+        images_ids = set(img.id for img in images)
+        if not images_ids:
+            return None
+
+        # find all image groups for all images of the set
+        image_groups_ids: typing.List[int] = []
+        for img in images:
+            ig_ii_c = models.ImageGroupImageInstanceCollection().fetch_with_filter(
+                "imageinstance", img.id
             )
-        if not to_reference and not to_images:
-            raise ValueError("either to_reference is True, or dest_imgs is non empty")
+            if ig_ii_c is False:
+                raise ValueError(f"unable to fetch image groups for {img=}")
+            for ig_ii_ in ig_ii_c:
+                image_groups_ids.append(ig_ii_.group)
 
-        if not self.parameters.annotations_to_map:
-            return
+        # find all images for each one of these groups (if any)
+        for ig_ in image_groups_ids:
+            ig_ii_c = models.ImageGroupImageInstanceCollection().fetch_with_filter(
+                "imagegroup", ig_
+            )
+            if ig_ii_c is False:
+                raise ValueError(f"unable to fetch image group {ig_=}")
 
-        # create an output collection
-        # warp all annotation that aren't on the reference image
+            found_img_ids = set(ig_ii.image for ig_ii in ig_ii_c)
 
-        reference_image = self.get_reference_image(registrar)
-        reference_slide = registrar.get_slide(self.get_fname(reference_image))
+            # find the first one to include all images
+            if found_img_ids.intersection(images_ids) == images_ids:
+                image_group = models.ImageGroup().fetch(ig_)
+                if image_group is False:
+                    raise ValueError(f"unable to fetch image group {ig_}")
+                return image_group
 
-        annotations = models.AnnotationCollection()
+        return None
 
-        image_cache = {int(img.id): img for img in self.parameters.all_images}
+    def map_annotation_from_to(
+        self,
+        annotation: models.Annotation,
+        src_image: models.ImageInstance,
+        dst_image: models.ImageInstance,
+        registrar: registration.Valis,
+    ):
+        src_slide: registration.Slide = registrar.get_slide(self.get_fname(src_image))
+        dst_slide: registration.Slide = registrar.get_slide(self.get_fname(dst_image))
 
-        if to_reference:
-            to_images = [reference_image]
-        else:
-            for idx, img in enumerate(to_images):
-                if not isinstance(img, (models.ImageInstance)):
-                    raise ValueError(f"img at {idx=} is not an ImageInstance")
+        src_geometry_bl = shapely.wkt.loads(annotation.location)
+        src_geometry_tl = affine_transform(
+            src_geometry_bl, [1, 0, 0, -1, 0, src_image.height]
+        )
 
-            if any(img.id in image_cache for img in to_images):
-                raise ValueError(
-                    "when warping to non-reference image, only \
-                    new images are supported"
-                )
+        # NOTE need to update when downloading at a lower resolution
+        # src_shape = image_shape(self.get_thumb_path(src_image))
+        # src_geometry_file_tl = affine_transform(src_geometry_tl,[src_shape[0] / src_image.width,0,0,src_shape[1] / src_image.height,0,0])
+        src_geometry_file_tl = src_geometry_tl
 
-        def warper(src: registration.Slide, x, y, z=None):
-            if z is not None:
-                raise ValueError("unable to warp 3D points")
-
+        def warper_(x, y, z=None):
+            assert z is None
             xy = np.stack([x, y], axis=1)
-            if to_reference:
-                warped_xy = src.warp_xy_from_to(xy, reference_slide)
-            else:
-                warped_xy = src.warp_xy(xy, crop=True)
+            warped_xy = src_slide.warp_xy_from_to(xy, dst_slide)
 
             return warped_xy[:, 0], warped_xy[:, 1]
 
+        dst_geometry_file_tl = transform(warper_, src_geometry_file_tl)
+
+        # NOTE need to update when downloading at a lower resolution
+        # dst_shape = image_shape(self.get_thumb_path(dst_image))
+        # dst_geometry_tl = affine_transform(dst_geometry_file_tl,[dst_image.width / dst_shape[0],0,0,dst_image.height / dst_shape[1],0,0])
+        dst_geometry_tl = dst_geometry_file_tl
+        dst_geometry_bl = affine_transform(
+            dst_geometry_tl, [1, 0, 0, -1, 0, dst_image.height]
+        )
+
+        if not dst_geometry_bl.is_valid:
+            raise ValueError(f"warping {annotation.id} produced an invalid geometry")
+
+        return models.Annotation(
+            shapely.wkt.dumps(dst_geometry_bl),
+            dst_image.id,
+            annotation.term,
+            annotation.project,
+        )
+
+    def map_annotation_to_reference(
+        self,
+        annotation: models.Annotation,
+        src_image: models.ImageInstance,
+        dst_image: models.ImageInstance,
+        registrar: registration.Valis,
+    ):
+        src_slide: registration.Slide = registrar.get_slide(self.get_fname(src_image))
+
+        src_geometry_bl = shapely.wkt.loads(annotation.location)
+        src_geometry_tl = affine_transform(
+            src_geometry_bl, [1, 0, 0, -1, 0, src_image.height]
+        )
+
+        # NOTE need to update when downloading at a lower resolution
+        # src_shape = image_shape(self.get_thumb_path(src_image))
+        # src_geometry_file_tl = affine_transform(src_geometry_tl,[src_shape[0] / src_image.width,0,0,src_shape[1] / src_image.height,0,0])
+        src_geometry_file_tl = src_geometry_tl
+
+        def warper_(x, y, z=None):
+            assert z is None
+            xy = np.stack([x, y], axis=1)
+            warped_xy = src_slide.warp_xy(xy)
+
+            return warped_xy[:, 0], warped_xy[:, 1]
+
+        dst_geometry_file_tl = transform(warper_, src_geometry_file_tl)
+
+        # no need to scale up: this is the file that was uploaded
+        dst_geometry_tl = dst_geometry_file_tl
+        dst_geometry_bl = affine_transform(
+            dst_geometry_tl, [1, 0, 0, -1, 0, dst_image.height]
+        )
+
+        if not dst_geometry_bl.is_valid:
+            raise ValueError(f"warping {annotation.id} produced an invalid geometry")
+
+        return models.Annotation(
+            shapely.wkt.dumps(dst_geometry_bl),
+            dst_image.id,
+            annotation.term,
+            annotation.project,
+        )
+
+    def _map_annotations_generic(
+        self,
+        registrar: registration.Valis,
+        images: typing.Sequence[models.ImageInstance],
+        mode: typing.Union[typing.Literal["to-warped"], typing.Literal["to-source"]],
+        image_group: typing.Optional[models.ImageGroup] = None,
+    ):
+        if mode == "to-warped":
+            mapper = self.map_annotation_to_reference
+        elif mode == "to-source":
+            mapper = self.map_annotation_from_to
+        else:
+            raise ValueError(f"invalid value for {mode=!r}")
+
+        if not self.parameters.annotations_to_map:
+            return
+        if not images:
+            return
+
+        image_cache = {int(img.id): img for img in self.parameters.all_images}
+
         for annotation in self.parameters.annotations_to_map:
-            image = image_cache[annotation.image]
-            slide: registration.Slide = registrar.get_slide(self.get_fname(image))
+            src_img = image_cache[annotation.image]
 
-            # get annotation geometry
-            geometry = shapely.wkt.loads(annotation.location)
+            an_c = models.AnnotationCollection()
+            for dst_image in images:
+                an = mapper(annotation, src_img, dst_image, registrar)
 
-            # convert to top-left coordinate
-            geometry = affine_transform(geometry, [1, 0, 0, -1, 0, image.height])
+                if not an.save():
+                    self.logger.error("unable to save new annotation")
+                an_c.append(an)
 
-            # warp points
-            geometry = transform(functools.partial(warper, slide), geometry)
-
-            for img in to_images:
-                if img.id == annotation.image:
-                    continue  # avoid duplicate annotations
-
-                # convert back to bottom-left coordinate
-                geometry_local = affine_transform(
-                    geometry, [1, 0, 0, -1, 0, img.height]
-                )
-
-                geometry_str = shapely.wkt.dumps(geometry_local)
-
-                annotations.append(
-                    models.Annotation(
-                        geometry_str,
-                        img.id,
-                        annotation.term,
-                        annotation.project,
+            if image_group is not None:
+                ag = models.AnnotationGroup(src_img.project, image_group.id)
+                if ag.save() is False:
+                    raise ValueError("cannot create annotation group")
+                for an in an_c:
+                    al = models.AnnotationLink(
+                        id_annotation=an.id, id_annotation_group=ag.id
                     )
-                )
+                    if al.save() is False:
+                        raise ValueError(f"could not link {an.id=!r}")
 
-        self.logger.info("pushing %d annotations", len(annotations))
-        annotations.save()
+    def map_annotations_to_uploaded_images(
+        self,
+        registrar: registration.Valis,
+        images: typing.Sequence[models.ImageInstance],
+    ):
+        image_group = self._find_image_group(images)
+        assert image_group is not None, "an image group should have been created"
+        self._map_annotations_generic(registrar, images, "to-warped", image_group)
+
+    def map_annotations_to_source_images(
+        self,
+        registrar: registration.Valis,
+        images: typing.Sequence[models.ImageInstance],
+    ):
+        image_group = self._find_image_group(images)
+        self._map_annotations_generic(registrar, images, "to-source", image_group)
 
     def warp_images(self, registrar: registration.Valis):
 
@@ -587,7 +686,26 @@ class VALISJob(typing.NamedTuple):
             else:
                 uploaded_files.append(uf)
 
-        return self.get_image_instances(uploaded_files)
+        images = self.get_image_instances(uploaded_files)
+        if len(images) != len(uploaded_files):
+            self.logger.error(
+                "some images were not properly uploaded, no image group will be created"
+            )
+            return images
+
+        ig_name = "{} {}".format(
+            self.cytomine_job.software.name,
+            datetime.datetime.utcnow().strftime("%Y/%m/%d %H:%M:%S"),
+        )
+        ig = models.ImageGroup(ig_name, self.cytomine_job.project.id).save()
+        if ig is False:
+            raise ValueError("unable to create a new image group")
+
+        for image in images:
+            if models.ImageGroupImageInstance(ig.id, image.id).save() is False:
+                raise ValueError(f"unable to add {image.id=} to {ig.id=}")
+
+        return images
 
     def get_image_instances(self, uploaded_files: typing.List[models.UploadedFile]):
 
