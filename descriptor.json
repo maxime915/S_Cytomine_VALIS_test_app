@@ -113,7 +113,7 @@
             "description": "Align images toward the reference, rather that directly to the reference. Meaningless if fewer than 3 images, see VALIS documentation for more info.",
             "type": "Boolean",
             "optional": true,
-            "default-value": true,
+            "default-value": false,
             "value-key": "@ID",
             "command-line-flag": "--@id"
         },
@@ -195,7 +195,7 @@
             "type": "Number",
             "integer": true,
             "optional": true,
-            "default-value": 850,
+            "default-value": 1000,
             "value-key": "@ID",
             "command-line-flag": "--@id"
         },

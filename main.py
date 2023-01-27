@@ -43,6 +43,11 @@ def ei(val: typing.Union[str, int]) -> int:
         return int(val)
     raise ValueError(f"{val=!r} is not an int")
 
+def eil(val: str) -> typing.List[int]:
+    if not val:
+        return []
+    return [ei(p) for p in val.split(",")]
+
 
 def eb(val: typing.Union[str, bool]) -> bool:
     "expect bool"
@@ -124,7 +129,7 @@ class JobParameters(typing.NamedTuple):
         if has("reference_image"):
             ref_image_id = ei(namespace.reference_image)
 
-        all_image_ids = [ei(i) for i in namespace.all_images.split(",")]
+        all_image_ids = eil(namespace.all_images)
 
         image_ordering = ImageOrdering.AUTO
         if has("image_ordering"):
@@ -162,13 +167,11 @@ class JobParameters(typing.NamedTuple):
 
         annotation_to_map_ids = []
         if has("annotation_to_map"):
-            annotation_to_map_ids = [
-                ei(i) for i in namespace.annotation_to_map.split(",")
-            ]
+            annotation_to_map_ids = eil(namespace.annotation_to_map)
 
         images_to_warp_ids = []
         if has("images_to_warp"):
-            images_to_warp_ids = [ei(i) for i in namespace.images_to_warp.split(",")]
+            images_to_warp_ids = eil(namespace.images_to_warp)
 
         upload_host = None
         if has("cytomine_upload_host"):
@@ -751,7 +754,11 @@ def main(arguments):
         src_dir.mkdir(exist_ok=True, parents=False)
         dst_base_dir.mkdir(exist_ok=True, parents=False)
 
-        VALISJob(job, parameters, src_dir, dst_dir, name).run()
+        logging.basicConfig()
+        logger = logging.getLogger("cytomine.client")
+        logger.setLevel(logging.DEBUG)
+
+        VALISJob(job, parameters, src_dir, dst_dir, name, logger).run()
 
         job.job.update(
             status=models.Job.TERMINATED, progress=100, status_comment="Job terminated"
