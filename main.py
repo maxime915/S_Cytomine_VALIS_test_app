@@ -211,10 +211,9 @@ class JobParameters(typing.NamedTuple):
         img_cache = {img.id: img for img in all_images_in_project}
         ann_cache = {ann.id: ann for ann in all_annotations_in_project}
 
-        if any(ann.image not in all_image_ids for ann in ann_cache.values()):
-            raise ValueError(
-                "annotations may only come from images in the registration sequence"
-            )
+        annotation_to_map = [ann_cache[id] for id in annotation_to_map_ids]
+        if any(ann.image not in all_image_ids for ann in annotation_to_map):
+            raise ValueError("annotations may only come from images in the registration sequence")
 
         return JobParameters(
             reference_image=img_cache.get(ref_image_id, None),
@@ -226,7 +225,7 @@ class JobParameters(typing.NamedTuple):
             compose_non_rigid=compose_non_rigid,
             max_proc_size=max_proc_size,
             micro_max_proc_size=micro_max_proc_size,
-            annotations_to_map=[ann_cache[id] for id in annotation_to_map_ids],
+            annotations_to_map=annotation_to_map,
             images_to_warp=[img_cache[idx] for idx in images_to_warp_ids],
             upload_host=upload_host,
             map_annotations_to_warped_images=map_annotations_to_warped_images,
