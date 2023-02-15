@@ -741,8 +741,8 @@ def main(arguments):
             status=models.Job.RUNNING, progress=0, status_comment="Initialization"
         )
 
-        src_dir = pathlib.Path(f"./valis-slides-{job.software.id}")
-        dst_base_dir = pathlib.Path(f"./valis-results-{job.software.id}")
+        src_dir = pathlib.Path(f"./valis-slides-{job.job.id}")
+        dst_base_dir = pathlib.Path(f"./valis-results-{job.job.id}")
 
         dst_dir = dst_base_dir / "internal"
         name = "main"
